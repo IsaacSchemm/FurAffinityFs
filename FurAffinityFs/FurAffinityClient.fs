@@ -10,8 +10,6 @@ type FurAffinityClientException(message: string) =
     inherit ApplicationException(message)
 
 type FurAffinityClient(a: string, b: string) =
-    let fafail str = raise (FurAffinityClientException str)
-
     let get_authenticity_token html =
         let m = Regex.Match(html, """<input type="hidden" name="key" value="([^"]+)".""")
 
@@ -59,43 +57,41 @@ type FurAffinityClient(a: string, b: string) =
         req2.ContentType <- sprintf "multipart/form-data; boundary=%s" h1
 
         do! async {
-            use! reqStream = req2.GetRequestStreamAsync() |> Async.AwaitTask
-
-            use fs = new FileStream("C:/Users/admin/Desktop/test.bin", FileMode.Create, FileAccess.Write)
+            use ms = new MemoryStream()
             let w (s: string) =
                 let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
-                fs.Write(bytes, 0, bytes.Length)
-                reqStream.AsyncWrite(bytes, 0, bytes.Length)
+                ms.Write(bytes, 0, bytes.Length)
             
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"part\""
-            do! w ""
-            do! w "3"
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"key\""
-            do! w ""
-            do! w key1
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"submission_type\""
-            do! w ""
-            do! w "submission"
-            do! w h2
-            do! w (sprintf "Content-Disposition: form-data; name=\"submission\"; filename=\"%s\"" filename)
-            do! w (sprintf "Content-Type: %s" submission.contentType)
-            do! w ""
-            do! reqStream.FlushAsync() |> Async.AwaitTask
-            do! reqStream.AsyncWrite (submission.data, 0, submission.data.Length)
-            do! reqStream.FlushAsync() |> Async.AwaitTask
-            do! fs.FlushAsync() |> Async.AwaitTask
-            do! fs.AsyncWrite (submission.data, 0, submission.data.Length)
-            do! fs.FlushAsync() |> Async.AwaitTask
-            do! w ""
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"thumbnail\"; filename=\"\""
-            do! w "Content-Type: application/octet-stream"
-            do! w ""
-            do! w ""
-            do! w h3
+            w h2
+            w "Content-Disposition: form-data; name=\"part\""
+            w ""
+            w "3"
+            w h2
+            w "Content-Disposition: form-data; name=\"key\""
+            w ""
+            w key1
+            w h2
+            w "Content-Disposition: form-data; name=\"submission_type\""
+            w ""
+            w "submission"
+            w h2
+            w (sprintf "Content-Disposition: form-data; name=\"submission\"; filename=\"%s\"" filename)
+            w (sprintf "Content-Type: %s" submission.contentType)
+            w ""
+            ms.Flush()
+            ms.Write(submission.data, 0, submission.data.Length)
+            ms.Flush()
+            w ""
+            w h2
+            w "Content-Disposition: form-data; name=\"thumbnail\"; filename=\"\""
+            w "Content-Type: application/octet-stream"
+            w ""
+            w ""
+            w h3
+
+            use! reqStream = req2.GetRequestStreamAsync() |> Async.AwaitTask
+            ms.Position <- 0L
+            do! ms.CopyToAsync(reqStream) |> Async.AwaitTask
         }
 
         let! (key2, url2) = async {
@@ -110,64 +106,68 @@ type FurAffinityClient(a: string, b: string) =
         req3.ContentType <- sprintf "multipart/form-data; boundary=%s" h1
 
         do! async {
-            use! reqStream = req3.GetRequestStreamAsync() |> Async.AwaitTask
-            use sw = new StreamWriter(reqStream)
-
-            let w (s: string) = sw.WriteLineAsync s |> Async.AwaitTask
+            use ms = new MemoryStream()
+            let w (s: string) =
+                let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
+                ms.Write(bytes, 0, bytes.Length)
             
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"part\""
-            do! w ""
-            do! w "5"
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"key\""
-            do! w ""
-            do! w key2
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"submission_type\""
-            do! w ""
-            do! w "submission"
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"cat_duplicate\""
-            do! w ""
-            do! w ""
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"title\""
-            do! w ""
-            do! w submission.title
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"message\""
-            do! w ""
-            do! w submission.message
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"keywords\""
-            do! w ""
-            do! w (submission.keywords |> Seq.map (fun s -> s.Replace(' ', '_')) |> String.concat " ")
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"cat\""
-            do! w ""
-            do! w (sprintf "%d" submission.cat)
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"atype\""
-            do! w ""
-            do! w (sprintf "%d" submission.atype)
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"species\""
-            do! w ""
-            do! w (sprintf "%d" submission.species)
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"gender\""
-            do! w ""
-            do! w (sprintf "%d" submission.gender)
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"rating\""
-            do! w ""
-            do! w (sprintf "%d" submission.rating)
-            do! w h2
-            do! w "Content-Disposition: form-data; name=\"create_folder_name\""
-            do! w ""
-            do! w ""
-            do! w h3
+            w h2
+            w "Content-Disposition: form-data; name=\"part\""
+            w ""
+            w "5"
+            w h2
+            w "Content-Disposition: form-data; name=\"key\""
+            w ""
+            w key2
+            w h2
+            w "Content-Disposition: form-data; name=\"submission_type\""
+            w ""
+            w "submission"
+            w h2
+            w "Content-Disposition: form-data; name=\"cat_duplicate\""
+            w ""
+            w ""
+            w h2
+            w "Content-Disposition: form-data; name=\"title\""
+            w ""
+            w submission.title
+            w h2
+            w "Content-Disposition: form-data; name=\"message\""
+            w ""
+            w submission.message
+            w h2
+            w "Content-Disposition: form-data; name=\"keywords\""
+            w ""
+            w (submission.keywords |> Seq.map (fun s -> s.Replace(' ', '_')) |> String.concat " ")
+            w h2
+            w "Content-Disposition: form-data; name=\"cat\""
+            w ""
+            w (sprintf "%d" submission.cat)
+            w h2
+            w "Content-Disposition: form-data; name=\"atype\""
+            w ""
+            w (sprintf "%d" submission.atype)
+            w h2
+            w "Content-Disposition: form-data; name=\"species\""
+            w ""
+            w (sprintf "%d" submission.species)
+            w h2
+            w "Content-Disposition: form-data; name=\"gender\""
+            w ""
+            w (sprintf "%d" submission.gender)
+            w h2
+            w "Content-Disposition: form-data; name=\"rating\""
+            w ""
+            w (sprintf "%d" submission.rating)
+            w h2
+            w "Content-Disposition: form-data; name=\"create_folder_name\""
+            w ""
+            w ""
+            w h3
+
+            use! reqStream = req3.GetRequestStreamAsync() |> Async.AwaitTask
+            ms.Position <- 0L
+            do! ms.CopyToAsync(reqStream) |> Async.AwaitTask
         }
 
         return! async {
