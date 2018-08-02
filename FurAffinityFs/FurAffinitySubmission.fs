@@ -6,9 +6,9 @@ type FurAffinitySubmission = {
     title: string
     message: string
     keywords: seq<string>
-    cat: int
-    atype: int
-    species: int
-    gender: int
-    rating: int
+    cat: FurAffinityCategory
+    atype: FurAffinityType
+    species: FurAffinitySpecies
+    gender: FurAffinityGender
+    rating: FurAffinityRating
 }

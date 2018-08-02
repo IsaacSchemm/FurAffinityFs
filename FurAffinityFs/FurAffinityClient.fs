@@ -24,7 +24,7 @@ type FurAffinityClient(a: string, b: string) =
         c
 
     let createRequest (url: Uri) =
-        WebRequest.CreateHttp(url, UserAgent = "FurAffinityFs/0.1 (https://github.com/libertyernie)", CookieContainer = cookies)
+        WebRequest.CreateHttp(url, UserAgent = "FurAffinityFs/0.1 (https://github.com/libertyernie/FurAffinityFs)", CookieContainer = cookies)
 
     member __.AsyncSubmitPost (submission: FurAffinitySubmission) = async {
         let ext = Seq.last (submission.contentType.Split('/'))
@@ -142,23 +142,23 @@ type FurAffinityClient(a: string, b: string) =
             w h2
             w "Content-Disposition: form-data; name=\"cat\""
             w ""
-            w (sprintf "%d" submission.cat)
+            w (submission.cat.ToString("d"))
             w h2
             w "Content-Disposition: form-data; name=\"atype\""
             w ""
-            w (sprintf "%d" submission.atype)
+            w (submission.atype.ToString("d"))
             w h2
             w "Content-Disposition: form-data; name=\"species\""
             w ""
-            w (sprintf "%d" submission.species)
+            w (submission.species.ToString("d"))
             w h2
             w "Content-Disposition: form-data; name=\"gender\""
             w ""
-            w (sprintf "%d" submission.gender)
+            w (submission.gender.ToString("d"))
             w h2
             w "Content-Disposition: form-data; name=\"rating\""
             w ""
-            w (sprintf "%d" submission.rating)
+            w (submission.rating.ToString("d"))
             w h2
             w "Content-Disposition: form-data; name=\"create_folder_name\""
             w ""
