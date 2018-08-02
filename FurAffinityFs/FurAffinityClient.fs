@@ -10,6 +10,8 @@ type FurAffinityClientException(message: string) =
     inherit ApplicationException(message)
 
 type FurAffinityClient(a: string, b: string) =
+    let base_uri = new Uri("https://www.furaffinity.net/")
+
     let get_authenticity_token html =
         let m = Regex.Match(html, """<input type="hidden" name="key" value="([^"]+)".""")
 
@@ -19,18 +21,23 @@ type FurAffinityClient(a: string, b: string) =
 
     let cookies =
         let c = new CookieContainer()
-        c.Add(new Uri("https://www.furaffinity.net"), new Cookie("a", a))
-        c.Add(new Uri("https://www.furaffinity.net"), new Cookie("b", b))
+        c.Add(base_uri, new Cookie("a", a))
+        c.Add(base_uri, new Cookie("b", b))
         c
 
     let createRequest (url: Uri) =
         WebRequest.CreateHttp(url, UserAgent = "FurAffinityFs/0.1 (https://github.com/libertyernie/FurAffinityFs)", CookieContainer = cookies)
 
+    let asyncOptionDefault (d: 'a) (w: Async<'a option>) = async {
+        let! o = w
+        return Option.defaultValue d o
+    }
+
     member __.AsyncSubmitPost (submission: FurAffinitySubmission) = async {
         let ext = Seq.last (submission.contentType.Split('/'))
         let filename = sprintf "file.%s" ext
 
-        let req1 = createRequest <| new Uri("https://www.furaffinity.net/submit/")
+        let req1 = createRequest <| new Uri(base_uri, "/submit/")
         req1.Method <- "POST"
         req1.ContentType <- "application/x-www-form-urlencoded"
 
@@ -176,4 +183,28 @@ type FurAffinityClient(a: string, b: string) =
         }
     }
 
+    member __.AsyncWhoami = async {
+        let req = createRequest base_uri
+        use! resp = req.AsyncGetResponse()
+        use sr = new StreamReader(resp.GetResponseStream())
+        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+        let m = Regex.Match(html, """id="my-username"[^>]*>~([^<]+)""")
+        return if m.Success
+            then Some m.Groups.[1].Value
+            else None
+    }
+
+    member __.AsyncGetAvatar username = async {
+        let req = createRequest(new Uri(base_uri, (sprintf "/user/%s" username)))
+        use! resp = req.AsyncGetResponse()
+        use sr = new StreamReader(resp.GetResponseStream())
+        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+        let m = Regex.Match(html, """img class="avatar"[^>]*src="([^"]+)""")
+        return if m.Success
+            then Some m.Groups.[1].Value
+            else None
+    }
+
     member this.SubmitPostAsync post = this.AsyncSubmitPost post |> Async.StartAsTask
+    member this.WhoamiAsync() = this.AsyncWhoami |> asyncOptionDefault null |> Async.StartAsTask
+    member this.GetAvatarAsync username = this.AsyncGetAvatar username |> asyncOptionDefault null |> Async.StartAsTask
