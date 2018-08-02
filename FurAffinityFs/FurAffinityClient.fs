@@ -194,17 +194,17 @@ type FurAffinityClient(a: string, b: string) =
             else None
     }
 
-    member __.AsyncGetAvatar username = async {
+    member __.AsyncGetAvatarUri username = async {
         let req = createRequest(new Uri(base_uri, (sprintf "/user/%s" username)))
         use! resp = req.AsyncGetResponse()
         use sr = new StreamReader(resp.GetResponseStream())
         let! html = sr.ReadToEndAsync() |> Async.AwaitTask
         let m = Regex.Match(html, """img class="avatar"[^>]*src="([^"]+)""")
         return if m.Success
-            then Some m.Groups.[1].Value
+            then Some (Uri (req.RequestUri, m.Groups.[1].Value))
             else None
     }
 
     member this.SubmitPostAsync post = this.AsyncSubmitPost post |> Async.StartAsTask
     member this.WhoamiAsync() = this.AsyncWhoami |> asyncOptionDefault null |> Async.StartAsTask
-    member this.GetAvatarAsync username = this.AsyncGetAvatar username |> asyncOptionDefault null |> Async.StartAsTask
+    member this.GetAvatarUriAsync username = this.AsyncGetAvatarUri username |> asyncOptionDefault null |> Async.StartAsTask
