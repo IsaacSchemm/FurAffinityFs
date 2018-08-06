@@ -170,6 +170,16 @@ type FurAffinityClient(a: string, b: string) =
             w "Content-Disposition: form-data; name=\"create_folder_name\""
             w ""
             w ""
+            if submission.scrap then
+                w h2
+                w "Content-Disposition: form-data; name=\"scrap\""
+                w ""
+                w "1"
+            if submission.lock_comments then
+                w h2
+                w "Content-Disposition: form-data; name=\"lock_comments\""
+                w ""
+                w "on"
             w h3
 
             use! reqStream = req3.GetRequestStreamAsync() |> Async.AwaitTask
