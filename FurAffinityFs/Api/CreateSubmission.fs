@@ -1,13 +1,14 @@
-﻿namespace FurAffinityFs.Requests
+﻿namespace FurAffinityFs.Api
+
+open System
+open System.Text
+open System.IO
+open FSharp.Data
+open FurAffinityFs
+open FurAffinityFs.Models
 
 module CreateSubmission =
-    open FSharp.Data
-    open System
-    open System.IO
-    open System.Text
-    open FurAffinityFs
-
-    let AsyncExecute (credentials: IFurAffinityCredentials) (submission: FurAffinityFs.Models.NewSubmission) = async {
+    let AsyncExecute (credentials: IFurAffinityCredentials) (submission: Artwork) = async {
         let ext = Seq.last (submission.contentType.Split('/'))
         let filename = sprintf "file.%s" ext
 
