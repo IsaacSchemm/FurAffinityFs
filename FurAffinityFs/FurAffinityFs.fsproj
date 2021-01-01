@@ -5,15 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="IFurAffinityCredentials.fs" />
-    <Compile Include="Shared.fs" />
+    <Compile Include="FurAffinityCredentials.fs" />
     <Compile Include="Models\Category.fs" />
     <Compile Include="Models\Type.fs" />
     <Compile Include="Models\Species.fs" />
     <Compile Include="Models\Gender.fs" />
     <Compile Include="Models\Rating.fs" />
     <Compile Include="Models\Artwork.fs" />
-    <Compile Include="Api\CreateSubmission.fs" />
+    <Compile Include="Api\PostArtwork.fs" />
   </ItemGroup>
 
   <ItemGroup>
