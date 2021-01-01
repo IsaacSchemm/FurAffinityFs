@@ -1,43 +1,17 @@
-namespace FurAffinityFs
+﻿namespace FurAffinityFs.Requests
 
-open System
-open System.Net
-open System.IO
-open System.Text.RegularExpressions
-open System.Text
+module CreateSubmission =
+    open FSharp.Data
+    open System
+    open System.IO
+    open System.Text
+    open FurAffinityFs
 
-type FurAffinityClientException(message: string) =
-    inherit ApplicationException(message)
-
-type FurAffinityClient(a: string, b: string) =
-    let base_uri = new Uri("https://www.furaffinity.net/")
-
-    let get_authenticity_token html =
-        let m = Regex.Match(html, """<input type="hidden" name="key" value="([^"]+)".""")
-
-        if m.Success
-            then m.Groups.[1].Value
-            else raise (FurAffinityClientException "Input \"key\" not found in HTML")
-
-    let cookies =
-        let c = new CookieContainer()
-        c.Add(base_uri, new Cookie("a", a))
-        c.Add(base_uri, new Cookie("b", b))
-        c
-
-    let createRequest (url: Uri) =
-        WebRequest.CreateHttp(url, UserAgent = "FurAffinityFs/0.1 (https://github.com/libertyernie/FurAffinityFs)", CookieContainer = cookies)
-
-    let asyncOptionDefault (d: 'a) (w: Async<'a option>) = async {
-        let! o = w
-        return Option.defaultValue d o
-    }
-
-    member __.AsyncSubmitPost (submission: FurAffinitySubmission) = async {
+    let AsyncExecute (credentials: IFurAffinityCredentials) (submission: FurAffinityFs.Models.NewSubmission) = async {
         let ext = Seq.last (submission.contentType.Split('/'))
         let filename = sprintf "file.%s" ext
 
-        let req1 = createRequest <| new Uri(base_uri, "/submit/")
+        let req1 = "/submit/" |> Shared.ToUri |> Shared.CreateRequest credentials
         req1.Method <- "POST"
         req1.ContentType <- "application/x-www-form-urlencoded"
 
@@ -51,7 +25,8 @@ type FurAffinityClient(a: string, b: string) =
             use! resp = req1.AsyncGetResponse()
             use sr = new StreamReader(resp.GetResponseStream())
             let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-            return (get_authenticity_token html, resp.ResponseUri)
+            let token = html |> HtmlDocument.Parse |> Shared.ExtractAuthenticityToken
+            return (token, resp.ResponseUri)
         }
 
         // multipart separators
@@ -59,7 +34,7 @@ type FurAffinityClient(a: string, b: string) =
         let h2 = sprintf "--%s" h1
         let h3 = sprintf "--%s--" h1
 
-        let req2 = createRequest url1
+        let req2 = Shared.CreateRequest credentials url1
         req2.Method <- "POST"
         req2.ContentType <- sprintf "multipart/form-data; boundary=%s" h1
 
@@ -105,10 +80,13 @@ type FurAffinityClient(a: string, b: string) =
             use! resp = req2.AsyncGetResponse()
             use sr = new StreamReader(resp.GetResponseStream())
             let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-            return (get_authenticity_token html, resp.ResponseUri)
+            if html.Contains "Security code missing or invalid." then
+                failwith "Security code missing or invalid"
+            let token = html |> HtmlDocument.Parse |> Shared.ExtractAuthenticityToken
+            return (token, resp.ResponseUri)
         }
 
-        let req3 = createRequest url2
+        let req3 = Shared.CreateRequest credentials url2
         req3.Method <- "POST"
         req3.ContentType <- sprintf "multipart/form-data; boundary=%s" h1
 
@@ -117,7 +95,7 @@ type FurAffinityClient(a: string, b: string) =
             let w (s: string) =
                 let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
                 ms.Write(bytes, 0, bytes.Length)
-            
+
             w h2
             w "Content-Disposition: form-data; name=\"part\""
             w ""
@@ -189,32 +167,14 @@ type FurAffinityClient(a: string, b: string) =
 
         return! async {
             use! resp = req3.AsyncGetResponse()
+            use sr = new StreamReader(resp.GetResponseStream())
+            let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+            if html.Contains "Security code missing or invalid." then
+                failwith "Security code missing or invalid"
             return resp.ResponseUri
         }
     }
 
-    member __.AsyncWhoami = async {
-        let req = createRequest base_uri
-        use! resp = req.AsyncGetResponse()
-        use sr = new StreamReader(resp.GetResponseStream())
-        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-        let m = Regex.Match(html, """id="my-username"[^>]*>~([^<]+)""")
-        return if m.Success
-            then Some m.Groups.[1].Value
-            else None
-    }
-
-    member __.AsyncGetAvatarUri username = async {
-        let req = createRequest(new Uri(base_uri, (sprintf "/user/%s" username)))
-        use! resp = req.AsyncGetResponse()
-        use sr = new StreamReader(resp.GetResponseStream())
-        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-        let m = Regex.Match(html, """img class="avatar"[^>]*src="([^"]+)""")
-        return if m.Success
-            then Some (Uri (req.RequestUri, m.Groups.[1].Value))
-            else None
-    }
-
-    member this.SubmitPostAsync post = this.AsyncSubmitPost post |> Async.StartAsTask
-    member this.WhoamiAsync() = this.AsyncWhoami |> asyncOptionDefault null |> Async.StartAsTask
-    member this.GetAvatarUriAsync username = this.AsyncGetAvatarUri username |> asyncOptionDefault null |> Async.StartAsTask
+    let ExecuteAsync credentials submission =
+        AsyncExecute credentials submission
+        |> Async.StartAsTask

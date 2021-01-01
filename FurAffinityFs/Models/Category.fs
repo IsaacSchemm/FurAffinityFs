@@ -1,9 +1,9 @@
-namespace FurAffinityFs
+namespace FurAffinityFs.Models
 
-type FurAffinityCategory =
+type Category =
     | ``All`` = 1
-    | ``Artwork_(Digital)`` = 2
-    | ``Artwork_(Traditional)`` = 3
+    | ``Artwork_Digital`` = 2
+    | ``Artwork_Traditional`` = 3
     | ``Cellshading`` = 4
     | ``Crafting`` = 5
     | ``Designs`` = 6
@@ -30,5 +30,5 @@ type FurAffinityCategory =
     | ``Screenshots`` = 27
     | ``Scraps`` = 28
     | ``Wallpaper`` = 29
-    | ``YCH_/_Sale`` = 30
+    | ``YCH_or_Sale`` = 30
     | ``Other`` = 31
