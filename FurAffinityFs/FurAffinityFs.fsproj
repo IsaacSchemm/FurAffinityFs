@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <Compile Include="FurAffinityCredentials.fs" />
+    <Compile Include="FurAffinityFile.fs" />
     <Compile Include="FurAffinityCategory.fs" />
     <Compile Include="FurAffinityType.fs" />
     <Compile Include="FurAffinitySpecies.fs" />

@@ -34,9 +34,7 @@ module FurAffinitySubmission =
     let private CreateRequest (credentials: IFurAffinityCredentials) (uri: Uri) =
         WebRequest.CreateHttp(uri, UserAgent = UserAgent, CookieContainer = GetCookiesFor credentials)
 
-    type Artwork = {
-        data: byte[]
-        contentType: string
+    type ArtworkMetadata = {
         title: string
         message: string
         keywords: string seq
@@ -49,13 +47,13 @@ module FurAffinitySubmission =
         lock_comments: bool
     }
 
-    let AsyncPostArtwork (credentials: IFurAffinityCredentials) (submission: Artwork) = async {
+    let AsyncPostArtwork (credentials: IFurAffinityCredentials) (file: FurAffinityFile) (metadata: ArtworkMetadata) = async {
         // multipart separators
         let boundary = sprintf "-----------------------------%d" DateTime.UtcNow.Ticks
         let interior_boundary = sprintf "--%s" boundary
         let final_boundary = sprintf "--%s--" boundary
 
-        let ext = Seq.last (submission.contentType.Split('/'))
+        let ext = Seq.last (file.contentType.Split('/'))
         let filename = sprintf "file.%s" ext
 
         let initial_submission_page_req = "/submit/" |> ToUri |> CreateRequest credentials
@@ -100,10 +98,10 @@ module FurAffinitySubmission =
             w "submission"
             w interior_boundary
             w (sprintf "Content-Disposition: form-data; name=\"submission\"; filename=\"%s\"" filename)
-            w (sprintf "Content-Type: %s" submission.contentType)
+            w (sprintf "Content-Type: %s" file.contentType)
             w ""
             memory_buffer.Flush()
-            memory_buffer.Write(submission.data, 0, submission.data.Length)
+            memory_buffer.Write(file.data, 0, file.data.Length)
             memory_buffer.Flush()
             w ""
             w interior_boundary
@@ -157,45 +155,45 @@ module FurAffinitySubmission =
             w interior_boundary
             w "Content-Disposition: form-data; name=\"title\""
             w ""
-            w submission.title
+            w metadata.title
             w interior_boundary
             w "Content-Disposition: form-data; name=\"message\""
             w ""
-            w submission.message
+            w metadata.message
             w interior_boundary
             w "Content-Disposition: form-data; name=\"keywords\""
             w ""
-            w (submission.keywords |> Seq.map (fun s -> s.Replace(' ', '_')) |> String.concat " ")
+            w (metadata.keywords |> Seq.map (fun s -> s.Replace(' ', '_')) |> String.concat " ")
             w interior_boundary
             w "Content-Disposition: form-data; name=\"cat\""
             w ""
-            w (submission.cat.ToString("d"))
+            w (metadata.cat.ToString("d"))
             w interior_boundary
             w "Content-Disposition: form-data; name=\"atype\""
             w ""
-            w (submission.atype.ToString("d"))
+            w (metadata.atype.ToString("d"))
             w interior_boundary
             w "Content-Disposition: form-data; name=\"species\""
             w ""
-            w (submission.species.ToString("d"))
+            w (metadata.species.ToString("d"))
             w interior_boundary
             w "Content-Disposition: form-data; name=\"gender\""
             w ""
-            w (submission.gender.ToString("d"))
+            w (metadata.gender.ToString("d"))
             w interior_boundary
             w "Content-Disposition: form-data; name=\"rating\""
             w ""
-            w (submission.rating.ToString("d"))
+            w (metadata.rating.ToString("d"))
             w interior_boundary
             w "Content-Disposition: form-data; name=\"create_folder_name\""
             w ""
             w ""
-            if submission.scrap then
+            if metadata.scrap then
                 w interior_boundary
                 w "Content-Disposition: form-data; name=\"scrap\""
                 w ""
                 w "1"
-            if submission.lock_comments then
+            if metadata.lock_comments then
                 w interior_boundary
                 w "Content-Disposition: form-data; name=\"lock_comments\""
                 w ""
@@ -217,6 +215,6 @@ module FurAffinitySubmission =
         }
     }
 
-    let PostArtworkAsync credentials submission =
-        AsyncPostArtwork credentials submission
+    let PostArtworkAsync credentials file metadata =
+        AsyncPostArtwork credentials file metadata
         |> Async.StartAsTask

@@ -16,9 +16,10 @@ Usage
 
         Uri uri = await FurAffinitySubmission.PostArtworkAsync(
             new FurAffinityCredentials(a, b),
-            new FurAffinitySubmission.PostArtworkAsync.Artwork(
-                data: File.ReadAllBytes(@"C:\Windows\Web\Wallpaper\Windows\img0.jpg"),
-                contentType: "image/jpeg",
+            new FurAffinityFile(
+                File.ReadAllBytes(@"C:\Windows\Web\Wallpaper\Windows\img0.jpg"),
+                "image/jpeg"),
+            new FurAffinitySubmission.ArtworkMetadata(
                 title: "Test 1",
                 message: "This is a test",
                 keywords: new[] { "test_1", "test_2" },
