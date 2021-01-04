@@ -12,7 +12,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FurAffinityFs.AzureFunctionsEndpoint", "FurAffinityFs.AzureFunctionsEndpoint\FurAffinityFs.AzureFunctionsEndpoint.csproj", "{FA1CEB27-DDD1-4809-A875-685F75323A5A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FurAffinityFs.AzureFunctions", "FurAffinityFs.AzureFunctions\FurAffinityFs.AzureFunctions.csproj", "{FA1CEB27-DDD1-4809-A875-685F75323A5A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

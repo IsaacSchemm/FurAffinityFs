@@ -6,11 +6,10 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 
-namespace FurAffinityFs.AzureFunctionsEndpoint {
+namespace FurAffinityFs.AzureFunctions {
     public static class PostArtwork {
         public class Parameters {
             [JsonRequired]
@@ -29,15 +28,15 @@ namespace FurAffinityFs.AzureFunctionsEndpoint {
             public string Title { get; set; }
 
             [JsonRequired]
-            public Models.Rating Rating { get; set; }
+            public FurAffinityRating Rating { get; set; }
 
             public string Description { get; set; }
-            public IEnumerable<string> Tags { get; set; }
-            public Models.Category? Category { get; set; }
+            public string[] Tags { get; set; }
+            public FurAffinityCategory? Category { get; set; }
             public bool? Scraps { get; set; }
-            public Models.Type? Type { get; set; }
-            public Models.Species? Species { get; set; }
-            public Models.Gender? Gender { get; set; }
+            public FurAffinityType? Type { get; set; }
+            public FurAffinitySpecies? Species { get; set; }
+            public FurAffinityGender? Gender { get; set; }
             public bool? LockComments { get; set; }
         }
 
@@ -52,22 +51,22 @@ namespace FurAffinityFs.AzureFunctionsEndpoint {
                 string json = await sr.ReadToEndAsync();
 
                 var parameters = JsonConvert.DeserializeObject<Parameters>(json);
-                var uri = await Api.PostArtwork.ExecuteAsync(
+                var uri = await FurAffinitySubmission.PostArtworkAsync(
                     new FurAffinityCredentials(
                         a: parameters.A,
                         b: parameters.B),
-                    new Models.Artwork(
+                    new FurAffinitySubmission.Artwork(
                         data: Convert.FromBase64String(parameters.Base64),
                         contentType: parameters.ContentType,
                         title: parameters.Title,
                         rating: parameters.Rating,
                         message: parameters.Description ?? "",
                         keywords: parameters.Tags ?? Enumerable.Empty<string>(),
-                        cat: parameters.Category ?? Models.Category.All,
+                        cat: parameters.Category ?? FurAffinityCategory.All,
                         scrap: parameters.Scraps ?? false,
-                        atype: parameters.Type ?? Models.Type.All,
-                        species: parameters.Species ?? Models.Species.Unspecified,
-                        gender: parameters.Gender ?? Models.Gender.Any,
+                        atype: parameters.Type ?? FurAffinityType.All,
+                        species: parameters.Species ?? FurAffinitySpecies.Unspecified,
+                        gender: parameters.Gender ?? FurAffinityGender.Any,
                         lock_comments: parameters.LockComments ?? false));
                 return new OkObjectResult(uri.AbsoluteUri);
             } catch (JsonException ex) {

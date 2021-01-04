@@ -1,6 +1,10 @@
 # FurAffinityFs
 
-This is a .NET library that allows artwork uploads to [Fur Affinity](https://sfw.furaffinity.net/).
+This is a .NET library that lets you upload artwork to [Fur Affinity](https://sfw.furaffinity.net/).
+
+Not supported:
+* Uploading other types of submissions (e.g. poetry, journals)
+* Fetching info on submissions already posted (use [FAExport](https://github.com/Deer-Spangle/faexport) instead)
 
 Usage
 
@@ -10,20 +14,20 @@ Usage
         Console.Write("b cookie: ");
         string b = Console.ReadLine();
 
-        Uri uri = await FurAffinityFs.Api.PostArtwork.ExecuteAsync(
-            new FurAffinityFs.FurAffinityCredentials(a, b),
-            new FurAffinityFs.Models.Artwork(
+        Uri uri = await FurAffinitySubmission.PostArtworkAsync(
+            new FurAffinityCredentials(a, b),
+            new FurAffinitySubmission.PostArtworkAsync.Artwork(
                 data: File.ReadAllBytes(@"C:\Windows\Web\Wallpaper\Windows\img0.jpg"),
                 contentType: "image/jpeg",
                 title: "Test 1",
                 message: "This is a test",
                 keywords: new[] { "test_1", "test_2" },
-                cat: FurAffinityFs.Models.Category.Scraps,
+                cat: FurAffinityCategory.Scraps,
                 scrap: true,
-                atype: FurAffinityFs.Models.Type.General_Furry_Art,
-                species: FurAffinityFs.Models.Species.Exotic_Other,
-                gender: FurAffinityFs.Models.Gender.Other_or_Not_Specified,
-                rating: FurAffinityFs.Models.Rating.General,
+                atype: FurAffinityType.General_Furry_Art,
+                species: FurAffinitySpecies.Exotic_Other,
+                gender: FurAffinityGender.Other_or_Not_Specified,
+                rating: FurAffinityRating.General,
                 lock_comments: true)
         );
 
