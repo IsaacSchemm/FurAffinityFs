@@ -34,3 +34,6 @@ Usage
 
         Console.WriteLine(uri);
     }
+
+The project FurAffinityFs.Gui is a VB.NET / WinForms sample app with a GUI for
+uploading your pics. You can build an .exe with Visual Studio 2019.
