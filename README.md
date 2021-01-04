@@ -2,11 +2,13 @@
 
 This is a .NET library that lets you upload artwork to [Fur Affinity](https://sfw.furaffinity.net/).
 
+https://www.nuget.org/packages/FurAffinityFs
+
 Not supported:
 * Uploading other types of submissions (e.g. poetry, journals)
 * Fetching info on submissions already posted (use [FAExport](https://github.com/Deer-Spangle/faexport) instead)
 
-Usage
+Usage (C#)
 
     public static async Task Main() {
         Console.Write("a cookie: ");
@@ -34,6 +36,3 @@ Usage
 
         Console.WriteLine(uri);
     }
-
-The project FurAffinityFs.Gui is a VB.NET / WinForms sample app with a GUI for
-uploading your pics. You can build an .exe with Visual Studio 2019.
