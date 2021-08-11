@@ -56,25 +56,16 @@ module FurAffinitySubmission =
         let ext = Seq.last (file.contentType.Split('/'))
         let filename = sprintf "file.%s" ext
 
-        let initial_submission_page_req = "/submit/" |> ToUri |> CreateRequest credentials
-        initial_submission_page_req.Method <- "POST"
-        initial_submission_page_req.ContentType <- "application/x-www-form-urlencoded"
-
-        do! async {
-            use! reqStream = initial_submission_page_req.GetRequestStreamAsync() |> Async.AwaitTask
-            use sw = new StreamWriter(reqStream)
-            do! "part=2&submission_type=submission" |> sw.WriteLineAsync |> Async.AwaitTask
-        }
-        
-        let! (artwork_submission_page_key, artwork_submission_page_url) = async {
-            use! resp = initial_submission_page_req.AsyncGetResponse()
+        let! artwork_submission_page_key = async {
+            let req = "/submit/" |> ToUri |> CreateRequest credentials
+            use! resp = req.AsyncGetResponse()
             use sr = new StreamReader(resp.GetResponseStream())
             let! html = sr.ReadToEndAsync() |> Async.AwaitTask
             let token = html |> HtmlDocument.Parse |> ExtractAuthenticityToken
-            return (token, resp.ResponseUri)
+            return token
         }
 
-        let artwork_submission_page_req = CreateRequest credentials artwork_submission_page_url
+        let artwork_submission_page_req = CreateRequest credentials (ToUri "/submit/upload")
         artwork_submission_page_req.Method <- "POST"
         artwork_submission_page_req.ContentType <- sprintf "multipart/form-data; boundary=%s" boundary
 
@@ -83,11 +74,7 @@ module FurAffinitySubmission =
             let w (s: string) =
                 let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
                 memory_buffer.Write(bytes, 0, bytes.Length)
-            
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"part\""
-            w ""
-            w "3"
+
             w interior_boundary
             w "Content-Disposition: form-data; name=\"key\""
             w ""
