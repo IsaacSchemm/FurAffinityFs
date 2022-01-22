@@ -1,10 +1,16 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Demo {
     class Program {
         static async Task Main() {
+            var species = await FurAffinityFs.FurAffinitySubmission.ListSpeciesAsync();
+            var lizard = species
+                .Where(x => x.Name == "Lizard")
+                .Select(x => x.Id)
+                .Single();
             var result = await FurAffinityFs.FurAffinitySubmission.PostArtworkAsync(
                 new FurAffinityFs.FurAffinityCredentials(
                     a: "afcfaa2e-06f8-4f83-90f4-4dfdf7df93f0",
@@ -20,7 +26,7 @@ namespace Demo {
                     cat: FurAffinityFs.FurAffinityCategory.Artwork_Digital,
                     scrap: true,
                     atype: FurAffinityFs.FurAffinityType.General_Furry_Art,
-                    species: FurAffinityFs.FurAffinitySpecies.Lizard,
+                    species: lizard,
                     gender: FurAffinityFs.FurAffinityGender.Male,
                     rating: FurAffinityFs.FurAffinityRating.General));
             Console.WriteLine(result);

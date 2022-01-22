@@ -41,11 +41,51 @@ module FurAffinitySubmission =
         cat: FurAffinityCategory
         scrap: bool
         atype: FurAffinityType
-        species: FurAffinitySpecies
+        species: FurAffinitySpeciesId
         gender: FurAffinityGender
         rating: FurAffinityRating
         lock_comments: bool
     }
+
+    let AsyncListSpecies () = async {
+        let req = WebRequest.CreateHttp("https://sfw.furaffinity.net/browse/", UserAgent = UserAgent)
+        use! resp = req.AsyncGetResponse()
+        use sr = new StreamReader(resp.GetResponseStream())
+        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+        let document = HtmlDocument.Parse html
+
+        let getName node =
+            node
+            |> HtmlNode.innerText
+        let getValue node =
+            node
+            |> HtmlNode.tryGetAttribute "value"
+            |> Option.map (fun a -> HtmlAttribute.value a)
+            |> Option.defaultValue (getName node)
+        let getLabel node =
+            node
+            |> HtmlNode.tryGetAttribute "label"
+            |> Option.map (fun a -> HtmlAttribute.value a)
+
+        let toSpecies (option: HtmlNode) (optgroup: HtmlNode option) = {
+            Group = Option.bind getLabel optgroup
+            Id = FurAffinitySpeciesId (getValue option)
+            Name = getName option
+        }
+
+        let getChildren node = HtmlNode.descendants false (fun _ -> true) node
+
+        return [
+            for select in document.CssSelect "select[name=species]" do
+                for x in getChildren select do
+                    match (HtmlNode.name x).ToLowerInvariant() with
+                    | "option" -> toSpecies x None
+                    | "optgroup" -> for y in getChildren x do toSpecies y (Some x)
+                    | _ -> ()
+        ]
+    }
+
+    let ListSpeciesAsync () = AsyncListSpecies () |> Async.StartAsTask
 
     let AsyncPostArtwork (credentials: IFurAffinityCredentials) (file: FurAffinityFile) (metadata: ArtworkMetadata) = async {
         // multipart separators
@@ -162,7 +202,7 @@ module FurAffinitySubmission =
             w interior_boundary
             w "Content-Disposition: form-data; name=\"species\""
             w ""
-            w (metadata.species.ToString("d"))
+            w (match metadata.species with FurAffinitySpeciesId str -> str)
             w interior_boundary
             w "Content-Disposition: form-data; name=\"gender\""
             w ""
