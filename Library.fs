@@ -6,12 +6,144 @@ open System.IO
 open System.Net
 open FSharp.Data
 
-module FurAffinitySubmission =
-    let private BaseUri =
-        new Uri("https://www.furaffinity.net/")
+module FurAffinity =
+    type ICredentials =
+        abstract member A: string
+        abstract member B: string
 
-    let private ToUri (path: string) =
-        new Uri(BaseUri, path)
+    type Credentials = {
+        a: string
+        b: string
+    } with
+        interface ICredentials with
+            member this.A = this.a
+            member this.B = this.b
+
+    type IFile =
+        abstract member Data: byte array
+        abstract member ContentType: string
+
+    type File = {
+        data: byte array
+        contentType: string
+    } with
+        interface IFile with
+            member this.Data = this.data
+            member this.ContentType = this.contentType
+
+    type Category =
+    | ``All`` = 1
+    | ``Artwork_Digital`` = 2
+    | ``Artwork_Traditional`` = 3
+    | ``Cellshading`` = 4
+    | ``Crafting`` = 5
+    | ``Designs`` = 6
+    | ``Flash`` = 7
+    | ``Fursuiting`` = 8
+    | ``Icons`` = 9
+    | ``Mosaics`` = 10
+    | ``Photography`` = 11
+    | ``Sculpting`` = 12
+    | ``Story`` = 13
+    | ``Poetry`` = 14
+    | ``Prose`` = 15
+    | ``Music`` = 16
+    | ``Podcasts`` = 17
+    | ``Skins`` = 18
+    | ``Handhelds`` = 19
+    | ``Resources`` = 20
+    | ``Adoptables`` = 21
+    | ``Auctions`` = 22
+    | ``Contests`` = 23
+    | ``Current_Events`` = 24
+    | ``Desktops`` = 25
+    | ``Stockart`` = 26
+    | ``Screenshots`` = 27
+    | ``Scraps`` = 28
+    | ``Wallpaper`` = 29
+    | ``YCH_or_Sale`` = 30
+    | ``Other`` = 31
+
+    type Type =
+    | ``All`` = 1
+    | ``Abstract`` = 2
+    | ``Animal_related_non_anthro`` = 3
+    | ``Anime`` = 4
+    | ``Comics`` = 5
+    | ``Doodle`` = 6
+    | ``Fanart`` = 7
+    | ``Fantasy`` = 8
+    | ``Human`` = 9
+    | ``Portraits`` = 10
+    | ``Scenery`` = 11
+    | ``Still_Life`` = 12
+    | ``Tutorials`` = 13
+    | ``Miscellaneous`` = 14
+    | ``Baby_fur`` = 101
+    | ``Bondage`` = 102
+    | ``Digimon`` = 103
+    | ``Fat_Furs`` = 104
+    | ``Fetish_Other`` = 105
+    | ``Fursuit`` = 106
+    | ``Gore_or_Macabre_Art`` = 119
+    | ``Hyper`` = 107
+    | ``Inflation`` = 108
+    | ``Macro_or_Micro`` = 109
+    | ``Muscle`` = 110
+    | ``My_Little_Pony_or_Brony`` = 111
+    | ``Paw`` = 112
+    | ``Pokemon`` = 113
+    | ``Pregnancy`` = 114
+    | ``Sonic`` = 115
+    | ``Transformation`` = 116
+    | ``TF_and_TG`` = 120
+    | ``Vore`` = 117
+    | ``Water_Sports`` = 118
+    | ``General_Furry_Art`` = 100
+    | ``Techno`` = 201
+    | ``Trance`` = 202
+    | ``House`` = 203
+    | ``90s`` = 204
+    | ``80s`` = 205
+    | ``70s`` = 206
+    | ``60s`` = 207
+    | ``Pre_60s`` = 208
+    | ``Classical`` = 209
+    | ``Game_Music`` = 210
+    | ``Rock`` = 211
+    | ``Pop`` = 212
+    | ``Rap`` = 213
+    | ``Industrial`` = 214
+    | ``Other_Music`` = 200
+
+    type SpeciesId = SpeciesId of string
+    with static member Unspecified = SpeciesId "1"
+
+    type Species = {
+        Group: string option
+        Name: string
+        Id: SpeciesId
+    }
+
+    type Gender =
+    | ``Any`` = 0
+    | ``Male`` = 2
+    | ``Female`` = 3
+    | ``Herm`` = 4
+    | ``Intersex`` = 11
+    | ``Trans_Male`` = 8
+    | ``Trans_Female`` = 9
+    | ``Non_Binary`` = 10
+    | ``Multiple_characters`` = 6
+    | ``Other_or_Not_Specified`` = 7
+
+    type Rating =
+    | General = 0
+    | Adult = 1
+    | Mature = 2
+
+    let private BaseAddress =
+        new Uri("https://www.furaffinity.net/")
 
     let private ExtractAuthenticityToken (html: HtmlDocument) =
         let m =
@@ -22,33 +154,30 @@ module FurAffinitySubmission =
             | Some token -> token
             | None -> failwith "Form \"myform\" with hidden input \"key\" not found in HTML from server"
 
-    let private GetCookiesFor (credentials: IFurAffinityCredentials) =
+    let private ToNewCookieContainer (credentials: ICredentials) =
         let c = new CookieContainer()
-        c.Add(BaseUri, new Cookie("a", credentials.A))
-        c.Add(BaseUri, new Cookie("b", credentials.B))
+        c.Add(BaseAddress, new Cookie("a", credentials.A))
+        c.Add(BaseAddress, new Cookie("b", credentials.B))
         c
 
     let UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0"
 
-    let private CreateRequest (credentials: IFurAffinityCredentials) (uri: Uri) =
-        WebRequest.CreateHttp(uri, UserAgent = UserAgent, CookieContainer = GetCookiesFor credentials)
-
     type ArtworkMetadata = {
         title: string
         message: string
         keywords: string seq
-        cat: FurAffinityCategory
+        cat: Category
         scrap: bool
-        atype: FurAffinityType
-        species: FurAffinitySpeciesId
-        gender: FurAffinityGender
-        rating: FurAffinityRating
+        atype: Type
+        species: SpeciesId
+        gender: Gender
+        rating: Rating
         lock_comments: bool
     }
 
     let AsyncListSpecies () = async {
-        let req = WebRequest.CreateHttp("https://sfw.furaffinity.net/browse/", UserAgent = UserAgent)
+        let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/browse/"), UserAgent = UserAgent)
         use! resp = req.AsyncGetResponse()
         use sr = new StreamReader(resp.GetResponseStream())
         let! html = sr.ReadToEndAsync() |> Async.AwaitTask
@@ -69,7 +198,7 @@ module FurAffinitySubmission =
 
         let toSpecies (option: HtmlNode) (optgroup: HtmlNode option) = {
             Group = Option.bind getLabel optgroup
-            Id = FurAffinitySpeciesId (getValue option)
+            Id = SpeciesId (getValue option)
             Name = getName option
         }
 
@@ -87,7 +216,12 @@ module FurAffinitySubmission =
 
     let ListSpeciesAsync () = AsyncListSpecies () |> Async.StartAsTask
 
-    let AsyncPostArtwork (credentials: IFurAffinityCredentials) (file: FurAffinityFile) (metadata: ArtworkMetadata) = async {
+    let AsyncPostArtwork (credentials: ICredentials) (file: File) (metadata: ArtworkMetadata) = async {
+        let toUri (path: string) =
+            new Uri(BaseAddress, path)
+        let createRequest (credentials: ICredentials) (uri: Uri) =
+            WebRequest.CreateHttp(uri, UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
+
         // multipart separators
         let boundary = sprintf "-----------------------------%d" DateTime.UtcNow.Ticks
         let interior_boundary = sprintf "--%s" boundary
@@ -97,7 +231,7 @@ module FurAffinitySubmission =
         let filename = sprintf "file.%s" ext
 
         let! artwork_submission_page_key = async {
-            let req = "/submit/" |> ToUri |> CreateRequest credentials
+            let req = "/submit/" |> toUri |> createRequest credentials
             use! resp = req.AsyncGetResponse()
             use sr = new StreamReader(resp.GetResponseStream())
             let! html = sr.ReadToEndAsync() |> Async.AwaitTask
@@ -105,7 +239,7 @@ module FurAffinitySubmission =
             return token
         }
 
-        let artwork_submission_page_req = CreateRequest credentials (ToUri "/submit/upload")
+        let artwork_submission_page_req = createRequest credentials (toUri "/submit/upload")
         artwork_submission_page_req.Method <- "POST"
         artwork_submission_page_req.ContentType <- sprintf "multipart/form-data; boundary=%s" boundary
 
@@ -153,7 +287,7 @@ module FurAffinitySubmission =
             return (token, resp.ResponseUri)
         }
 
-        let finalize_submission_page_req = CreateRequest credentials finalize_submission_page_url
+        let finalize_submission_page_req = createRequest credentials finalize_submission_page_url
         finalize_submission_page_req.Method <- "POST"
         finalize_submission_page_req.ContentType <- sprintf "multipart/form-data; boundary=%s" boundary
 
@@ -202,7 +336,7 @@ module FurAffinitySubmission =
             w interior_boundary
             w "Content-Disposition: form-data; name=\"species\""
             w ""
-            w (match metadata.species with FurAffinitySpeciesId str -> str)
+            w (match metadata.species with SpeciesId str -> str)
             w interior_boundary
             w "Content-Disposition: form-data; name=\"gender\""
             w ""

@@ -1,24 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFrameworks>net6.0;net48</TargetFrameworks>
     <Authors>Isaac Schemm</Authors>
     <Description>A library that lets you upload artwork to furaffinity.net</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/IsaacSchemm/FurAffinityFs</PackageProjectUrl>
-    <Version>3.0.0</Version>
+    <Version>4.0.0-beta1</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="FurAffinityCredentials.fs" />
-    <Compile Include="FurAffinityFile.fs" />
-    <Compile Include="FurAffinityCategory.fs" />
-    <Compile Include="FurAffinityType.fs" />
-    <Compile Include="FurAffinitySpecies.fs" />
-    <Compile Include="FurAffinityGender.fs" />
-    <Compile Include="FurAffinityRating.fs" />
-    <Compile Include="FurAffinitySubmission.fs" />
+    <Compile Include="Library.fs" />
   </ItemGroup>
 
   <ItemGroup>

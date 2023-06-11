@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FurAffinityFs;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,29 +7,29 @@ using System.Threading.Tasks;
 namespace Demo {
     class Program {
         static async Task Main() {
-            var species = await FurAffinityFs.FurAffinitySubmission.ListSpeciesAsync();
+            var species = await FurAffinity.ListSpeciesAsync();
             var lizard = species
                 .Where(x => x.Name == "Lizard")
                 .Select(x => x.Id)
                 .Single();
-            var result = await FurAffinityFs.FurAffinitySubmission.PostArtworkAsync(
-                new FurAffinityFs.FurAffinityCredentials(
+            var result = await FurAffinity.PostArtworkAsync(
+                new FurAffinity.Credentials(
                     a: "afcfaa2e-06f8-4f83-90f4-4dfdf7df93f0",
                     b: "6afd3cf9-8de9-4938-b9eb-2a39771337cf"),
-                new FurAffinityFs.FurAffinityFile(
+                new FurAffinity.File(
                     File.ReadAllBytes(@"C:\Users\admin\Pictures\mascot.png"),
                     "image/png"),
-                new FurAffinityFs.FurAffinitySubmission.ArtworkMetadata(
+                new FurAffinity.ArtworkMetadata(
                     title: "test title",
                     message: "test description",
                     lock_comments: true,
                     keywords: new[] { "tag1", "tag2" },
-                    cat: FurAffinityFs.FurAffinityCategory.Artwork_Digital,
+                    cat: FurAffinity.Category.Artwork_Digital,
                     scrap: true,
-                    atype: FurAffinityFs.FurAffinityType.General_Furry_Art,
+                    atype: FurAffinity.Type.General_Furry_Art,
                     species: lizard,
-                    gender: FurAffinityFs.FurAffinityGender.Male,
-                    rating: FurAffinityFs.FurAffinityRating.General));
+                    gender: FurAffinity.Gender.Male,
+                    rating: FurAffinity.Rating.General));
             Console.WriteLine(result);
         }
     }
