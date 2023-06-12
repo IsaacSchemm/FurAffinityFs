@@ -116,13 +116,13 @@ module FurAffinity =
     | ``Industrial`` = 214
     | ``Other_Music`` = 200
 
-    type SpeciesId = SpeciesId of string
-    with static member Unspecified = SpeciesId "1"
+    type Species = Species of id: string
+    with static member Unspecified = Species "1"
 
-    type Species = {
+    type SpeciesInformation = {
         Group: string option
         Name: string
-        Id: SpeciesId
+        Species: Species
     }
 
     type Gender =
@@ -163,19 +163,6 @@ module FurAffinity =
     let UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0"
 
-    type ArtworkMetadata = {
-        title: string
-        message: string
-        keywords: string seq
-        cat: Category
-        scrap: bool
-        atype: Type
-        species: SpeciesId
-        gender: Gender
-        rating: Rating
-        lock_comments: bool
-    }
-
     let AsyncListSpecies () = async {
         let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/browse/"), UserAgent = UserAgent)
         use! resp = req.AsyncGetResponse()
@@ -198,7 +185,7 @@ module FurAffinity =
 
         let toSpecies (option: HtmlNode) (optgroup: HtmlNode option) = {
             Group = Option.bind getLabel optgroup
-            Id = SpeciesId (getValue option)
+            Species = Species (getValue option)
             Name = getName option
         }
 
@@ -215,6 +202,56 @@ module FurAffinity =
     }
 
     let ListSpeciesAsync () = AsyncListSpecies () |> Async.StartAsTask
+
+    type ExistingGalleryFolder = ExistingGalleryFolder of id: int64
+
+    type ExistingGalleryFolderInformation = { Folder: ExistingGalleryFolder; Name: string }
+
+    let AsyncListGalleryFolders (credentials: ICredentials) = async {
+        let req = WebRequest.CreateHttp(new Uri(BaseAddress, $"/controls/folders/submissions/"), UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
+        use! resp = req.AsyncGetResponse()
+        use sr = new StreamReader(resp.GetResponseStream())
+        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+        let document = HtmlDocument.Parse html
+
+        let regex = new System.Text.RegularExpressions.Regex("^/gallery/[^/]+/folder/([0-9]+)/")
+        let extractId href =
+            let m = regex.Match href
+            if m.Success then Some (Int64.Parse m.Groups[1].Value) else None
+
+        return [
+            for link in document.CssSelect "a" do
+                let id =
+                    link.TryGetAttribute "href"
+                    |> Option.map (fun a -> HtmlAttribute.value a)
+                    |> Option.bind extractId
+                match id with
+                | Some s -> { Folder = ExistingGalleryFolder s; Name = HtmlNode.innerText link }
+                | None -> ()
+        ]
+    }
+
+    let ListGalleryFoldersAsync credentials = AsyncListGalleryFolders credentials |> Async.StartAsTask
+
+    type ArtworkMetadata = {
+        title: string
+        message: string
+        keywords: string list
+        cat: Category
+        scrap: bool
+        atype: Type
+        species: Species
+        gender: Gender
+        rating: Rating
+        lock_comments: bool
+        folder_ids: Set<int64>
+        create_folder_name: string option
+    }
+
+    let Keywords ([<ParamArray>] arr: string[]) = List.ofArray arr
+    let FolderIds ([<ParamArray>] arr: int64[]) = Set.ofArray arr
+    let NewFolder (name: string) = Some name
+    let NoNewFolder: string option = None
 
     let AsyncPostArtwork (credentials: ICredentials) (file: File) (metadata: ArtworkMetadata) = async {
         let toUri (path: string) =
@@ -243,7 +280,7 @@ module FurAffinity =
         artwork_submission_page_req.Method <- "POST"
         artwork_submission_page_req.ContentType <- sprintf "multipart/form-data; boundary=%s" boundary
 
-        do! async {
+        let body1 =
             use memory_buffer = new MemoryStream()
             let w (s: string) =
                 let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
@@ -272,9 +309,11 @@ module FurAffinity =
             w ""
             w final_boundary
 
+            memory_buffer.ToArray()
+
+        do! async {
             use! reqStream = artwork_submission_page_req.GetRequestStreamAsync() |> Async.AwaitTask
-            memory_buffer.Position <- 0L
-            do! memory_buffer.CopyToAsync reqStream |> Async.AwaitTask
+            do! reqStream.WriteAsync(body1, 0, body1.Length) |> Async.AwaitTask
         }
 
         let! (finalize_submission_page_key, finalize_submission_page_url) = async {
@@ -291,7 +330,7 @@ module FurAffinity =
         finalize_submission_page_req.Method <- "POST"
         finalize_submission_page_req.ContentType <- sprintf "multipart/form-data; boundary=%s" boundary
 
-        do! async {
+        let body2 =
             use ms = new MemoryStream()
             let w (s: string) =
                 let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
@@ -336,7 +375,8 @@ module FurAffinity =
             w interior_boundary
             w "Content-Disposition: form-data; name=\"species\""
             w ""
-            w (match metadata.species with SpeciesId str -> str)
+            let (Species species_id) = metadata.species
+            w species_id
             w interior_boundary
             w "Content-Disposition: form-data; name=\"gender\""
             w ""
@@ -359,11 +399,25 @@ module FurAffinity =
                 w "Content-Disposition: form-data; name=\"lock_comments\""
                 w ""
                 w "on"
+            for id in metadata.folder_ids do
+                w interior_boundary
+                w "Content-Disposition: form-data; name=\"folder_ids[]\""
+                w ""
+                w (sprintf "%d" id)
+            match metadata.create_folder_name with
+            | Some name ->
+                w interior_boundary
+                w "Content-Disposition: form-data; name=\"create_folder_name\""
+                w ""
+                w name
+            | None -> ()
             w final_boundary
 
+            ms.ToArray()
+
+        do! async {
             use! reqStream = finalize_submission_page_req.GetRequestStreamAsync() |> Async.AwaitTask
-            ms.Position <- 0L
-            do! ms.CopyToAsync(reqStream) |> Async.AwaitTask
+            do! reqStream.WriteAsync(body2, 0, body2.Length) |> Async.AwaitTask
         }
 
         return! async {
