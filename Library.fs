@@ -161,9 +161,9 @@ module FurAffinity =
         c
 
     let UserAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0"
 
-    let AsyncListSpecies () = async {
+    let AsyncListSpecies() = async {
         let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/browse/"), UserAgent = UserAgent)
         use! resp = req.AsyncGetResponse()
         use sr = new StreamReader(resp.GetResponseStream())
@@ -183,29 +183,26 @@ module FurAffinity =
             |> HtmlNode.tryGetAttribute "label"
             |> Option.map (fun a -> HtmlAttribute.value a)
 
-        let toSpecies (option: HtmlNode) (optgroup: HtmlNode option) = {
-            Group = Option.bind getLabel optgroup
-            Species = Species (getValue option)
-            Name = getName option
-        }
-
-        let getChildren node = HtmlNode.descendants false (fun _ -> true) node
+        let getDescendants node = HtmlNode.descendants false (fun _ -> true) node
 
         return [
             for select in document.CssSelect "select[name=species]" do
-                for x in getChildren select do
+                for x in getDescendants select do
                     match (HtmlNode.name x).ToLowerInvariant() with
-                    | "option" -> toSpecies x None
-                    | "optgroup" -> for y in getChildren x do toSpecies y (Some x)
+                    | "option" ->
+                        { Group = None; Species = Species (getValue x); Name = getName x}
+                    | "optgroup" ->
+                        for y in getDescendants x do
+                            { Group = getLabel x; Species = Species (getValue y); Name = getName y }
                     | _ -> ()
         ]
     }
 
-    let ListSpeciesAsync () = AsyncListSpecies () |> Async.StartAsTask
+    let ListSpeciesAsync() =
+        AsyncListSpecies()
+        |> Async.StartAsTask
 
-    type ExistingGalleryFolder = ExistingGalleryFolder of id: int64
-
-    type ExistingGalleryFolderInformation = { Folder: ExistingGalleryFolder; Name: string }
+    type ExistingGalleryFolderInformation = { FolderId: int64; Name: string }
 
     let AsyncListGalleryFolders (credentials: ICredentials) = async {
         let req = WebRequest.CreateHttp(new Uri(BaseAddress, $"/controls/folders/submissions/"), UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
@@ -226,12 +223,14 @@ module FurAffinity =
                     |> Option.map (fun a -> HtmlAttribute.value a)
                     |> Option.bind extractId
                 match id with
-                | Some s -> { Folder = ExistingGalleryFolder s; Name = HtmlNode.innerText link }
+                | Some s -> { FolderId = s; Name = HtmlNode.innerText link }
                 | None -> ()
         ]
     }
 
-    let ListGalleryFoldersAsync credentials = AsyncListGalleryFolders credentials |> Async.StartAsTask
+    let ListGalleryFoldersAsync credentials =
+        AsyncListGalleryFolders credentials
+        |> Async.StartAsTask
 
     type ArtworkMetadata = {
         title: string
@@ -256,6 +255,7 @@ module FurAffinity =
     let AsyncPostArtwork (credentials: ICredentials) (file: File) (metadata: ArtworkMetadata) = async {
         let toUri (path: string) =
             new Uri(BaseAddress, path)
+
         let createRequest (credentials: ICredentials) (uri: Uri) =
             WebRequest.CreateHttp(uri, UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
 
