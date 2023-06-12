@@ -8,11 +8,15 @@
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/IsaacSchemm/FurAffinityFs</PackageProjectUrl>
     <Version>4.0.0-beta1</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
     <Compile Include="Library.fs" />
   </ItemGroup>
+
+  <ItemGroup />
 
   <ItemGroup>
     <PackageReference Include="FSharp.Data.Html.Core" Version="6.2.0" />
