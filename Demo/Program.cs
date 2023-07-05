@@ -9,17 +9,17 @@ namespace Demo {
         static async Task Main() {
             var species = await FurAffinity.ListSpeciesAsync();
             var credentials = new FurAffinity.Credentials(
-                a: "afcfaa2e-06f8-4f83-90f4-4dfdf7df93f0",
-                b: "6afd3cf9-8de9-4938-b9eb-2a39771337cf");
-            var lizard = species
-                .Where(x => x.Name == "Lizard")
+                a: "fc71372a-f89c-4dc6-9009-b7d462f88951",
+                b: "cfd98cfb-113a-45bb-801c-0677a263ba59");
+            var slime = species
+                .Where(x => x.Name.Contains("Slime"))
                 .Select(x => x.Species)
                 .Single();
             var galleries = await FurAffinity.ListGalleryFoldersAsync(credentials);
             var result = await FurAffinity.PostArtworkAsync(
                 credentials,
                 new FurAffinity.File(
-                    File.ReadAllBytes(@"C:\Users\admin\Pictures\mascot.png"),
+                    File.ReadAllBytes(@"C:\Users\isaac\Desktop\test.png"),
                     "image/png"),
                 new FurAffinity.ArtworkMetadata(
                     title: "test title",
@@ -29,12 +29,12 @@ namespace Demo {
                     cat: FurAffinity.Category.Artwork_Digital,
                     scrap: true,
                     atype: FurAffinity.Type.General_Furry_Art,
-                    species: lizard,
+                    species: slime,
                     gender: FurAffinity.Gender.Male,
                     rating: FurAffinity.Rating.General,
                     folder_ids: FurAffinity.FolderIds(
-                        galleries[0].Folder.id,
-                        galleries[2].Folder.id),
+                        galleries[0].FolderId,
+                        galleries[2].FolderId),
                     create_folder_name: FurAffinity.NoNewFolder));
             Console.WriteLine(result);
         }
