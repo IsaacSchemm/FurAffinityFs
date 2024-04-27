@@ -87,6 +87,7 @@ module FurAffinity =
     | ``Fursuit`` = 106
     | ``Gore_or_Macabre_Art`` = 119
     | ``Hyper`` = 107
+    | ``Hypnosis`` = 121
     | ``Inflation`` = 108
     | ``Macro_or_Micro`` = 109
     | ``Muscle`` = 110
@@ -163,19 +164,20 @@ module FurAffinity =
     let UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
 
-    let AsyncWhoami(credentials) = async {
+    let AsyncWhoami credentials = async {
         let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/help/"), UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
         use! resp = req.AsyncGetResponse()
         use sr = new StreamReader(resp.GetResponseStream())
         let! html = sr.ReadToEndAsync() |> Async.AwaitTask
         let document = HtmlDocument.Parse html
-
-        let n = document.CssSelect("#my-username")
-        return String.concat " / " [for item in document.CssSelect("#my-username") do item.InnerText().Trim().TrimStart('~')]
+        return String.concat " / " [
+            for item in document.CssSelect("#my-username") do
+                item.InnerText().Trim().TrimStart('~')
+        ]
     }
 
-    let WhoamiAsync(credentials) =
-        AsyncWhoami(credentials)
+    let WhoamiAsync credentials =
+        AsyncWhoami credentials
         |> Async.StartAsTask
 
     let AsyncListSpecies() = async {
@@ -183,7 +185,7 @@ module FurAffinity =
         use! resp = req.AsyncGetResponse()
         use sr = new StreamReader(resp.GetResponseStream())
         let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-        let document = HtmlDocument.Parse html
+        let document = HtmlDocument.Parse(html)
 
         let getName node =
             node
