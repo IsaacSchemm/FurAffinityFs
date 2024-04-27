@@ -4,14 +4,15 @@
     <TargetFrameworks>net6.0;net48</TargetFrameworks>
     <Authors>Isaac Schemm</Authors>
     <Description>A library that lets you upload artwork to furaffinity.net</Description>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>MIT-0</PackageLicenseExpression>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/IsaacSchemm/FurAffinityFs</PackageProjectUrl>
-    <Version>4.0.0</Version>
+    <Version>4.1.0</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="LICENSE" />
     <None Include="README.md" Pack="true" PackagePath="\" />
     <Compile Include="Library.fs" />
   </ItemGroup>

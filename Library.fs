@@ -161,7 +161,22 @@ module FurAffinity =
         c
 
     let UserAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
+
+    let AsyncWhoami(credentials) = async {
+        let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/help/"), UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
+        use! resp = req.AsyncGetResponse()
+        use sr = new StreamReader(resp.GetResponseStream())
+        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+        let document = HtmlDocument.Parse html
+
+        let n = document.CssSelect("#my-username")
+        return String.concat " / " [for item in document.CssSelect("#my-username") do item.InnerText().Trim().TrimStart('~')]
+    }
+
+    let WhoamiAsync(credentials) =
+        AsyncWhoami(credentials)
+        |> Async.StartAsTask
 
     let AsyncListSpecies() = async {
         let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/browse/"), UserAgent = UserAgent)

@@ -11,6 +11,9 @@ namespace Demo {
             var credentials = new FurAffinity.Credentials(
                 a: "fc71372a-f89c-4dc6-9009-b7d462f88951",
                 b: "cfd98cfb-113a-45bb-801c-0677a263ba59");
+            string username = await FurAffinity.WhoamiAsync(credentials);
+            Console.WriteLine(username);
+
             var slime = species
                 .Where(x => x.Name.Contains("Slime"))
                 .Select(x => x.Species)
