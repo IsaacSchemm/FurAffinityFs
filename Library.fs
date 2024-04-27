@@ -33,110 +33,29 @@ module FurAffinity =
 
     type Category =
     | ``All`` = 1
-    | ``Artwork_Digital`` = 2
-    | ``Artwork_Traditional`` = 3
-    | ``Cellshading`` = 4
-    | ``Crafting`` = 5
-    | ``Designs`` = 6
-    | ``Flash`` = 7
-    | ``Fursuiting`` = 8
-    | ``Icons`` = 9
-    | ``Mosaics`` = 10
-    | ``Photography`` = 11
-    | ``Sculpting`` = 12
-    | ``Story`` = 13
-    | ``Poetry`` = 14
-    | ``Prose`` = 15
-    | ``Music`` = 16
-    | ``Podcasts`` = 17
-    | ``Skins`` = 18
-    | ``Handhelds`` = 19
-    | ``Resources`` = 20
-    | ``Adoptables`` = 21
-    | ``Auctions`` = 22
-    | ``Contests`` = 23
-    | ``Current_Events`` = 24
-    | ``Desktops`` = 25
-    | ``Stockart`` = 26
-    | ``Screenshots`` = 27
-    | ``Scraps`` = 28
-    | ``Wallpaper`` = 29
-    | ``YCH_or_Sale`` = 30
-    | ``Other`` = 31
 
     type Type =
     | ``All`` = 1
-    | ``Abstract`` = 2
-    | ``Animal_related_non_anthro`` = 3
-    | ``Anime`` = 4
-    | ``Comics`` = 5
-    | ``Doodle`` = 6
-    | ``Fanart`` = 7
-    | ``Fantasy`` = 8
-    | ``Human`` = 9
-    | ``Portraits`` = 10
-    | ``Scenery`` = 11
-    | ``Still_Life`` = 12
-    | ``Tutorials`` = 13
-    | ``Miscellaneous`` = 14
-    | ``Baby_fur`` = 101
-    | ``Bondage`` = 102
-    | ``Digimon`` = 103
-    | ``Fat_Furs`` = 104
-    | ``Fetish_Other`` = 105
-    | ``Fursuit`` = 106
-    | ``Gore_or_Macabre_Art`` = 119
-    | ``Hyper`` = 107
-    | ``Hypnosis`` = 121
-    | ``Inflation`` = 108
-    | ``Macro_or_Micro`` = 109
-    | ``Muscle`` = 110
-    | ``My_Little_Pony_or_Brony`` = 111
-    | ``Paw`` = 112
-    | ``Pokemon`` = 113
-    | ``Pregnancy`` = 114
-    | ``Sonic`` = 115
-    | ``Transformation`` = 116
-    | ``TF_and_TG`` = 120
-    | ``Vore`` = 117
-    | ``Water_Sports`` = 118
-    | ``General_Furry_Art`` = 100
-    | ``Techno`` = 201
-    | ``Trance`` = 202
-    | ``House`` = 203
-    | ``90s`` = 204
-    | ``80s`` = 205
-    | ``70s`` = 206
-    | ``60s`` = 207
-    | ``Pre_60s`` = 208
-    | ``Classical`` = 209
-    | ``Game_Music`` = 210
-    | ``Rock`` = 211
-    | ``Pop`` = 212
-    | ``Rap`` = 213
-    | ``Industrial`` = 214
-    | ``Other_Music`` = 200
 
-    type Species = Species of id: string
-    with static member Unspecified = Species "1"
-
-    type SpeciesInformation = {
-        Group: string option
-        Name: string
-        Species: Species
-    }
+    type Species =
+    | ``Unspecified_Any`` = 0
 
     type Gender =
     | ``Any`` = 0
-    | ``Male`` = 2
-    | ``Female`` = 3
-    | ``Herm`` = 4
-    | ``Intersex`` = 11
-    | ``Trans_Male`` = 8
-    | ``Trans_Female`` = 9
-    | ``Non_Binary`` = 10
-    | ``Multiple_characters`` = 6
-    | ``Other_or_Not_Specified`` = 7
+
+    type PostOption<'T when 'T :> Enum> = {
+        Group: string option
+        Name: string
+        Value: 'T
+    } with
+        override this.ToString() = $"""{this.Name} ({this.Value.ToString("d")})"""
+
+    type PostOptions = {
+        Categories: PostOption<Category> list
+        Types: PostOption<Type> list
+        Species: PostOption<Species> list
+        Genders: PostOption<Gender> list
+    }
 
     type Rating =
     | General = 0
@@ -180,7 +99,7 @@ module FurAffinity =
         AsyncWhoami credentials
         |> Async.StartAsTask
 
-    let AsyncListSpecies() = async {
+    let AsyncListPostOptions() = async {
         let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/browse/"), UserAgent = UserAgent)
         use! resp = req.AsyncGetResponse()
         use sr = new StreamReader(resp.GetResponseStream())
@@ -202,21 +121,28 @@ module FurAffinity =
 
         let getDescendants node = HtmlNode.descendants false (fun _ -> true) node
 
-        return [
-            for select in document.CssSelect "select[name=species]" do
+        let processSelects (selector: string) = [
+            for select in document.CssSelect selector do
                 for x in getDescendants select do
                     match (HtmlNode.name x).ToLowerInvariant() with
                     | "option" ->
-                        { Group = None; Species = Species (getValue x); Name = getName x}
+                        { Group = None; Value = getValue x |> int |> enum; Name = getName x}
                     | "optgroup" ->
                         for y in getDescendants x do
-                            { Group = getLabel x; Species = Species (getValue y); Name = getName y }
+                            { Group = getLabel x; Value = getValue y |> int |> enum; Name = getName y }
                     | _ -> ()
         ]
+
+        return {
+            Categories = processSelects "select[name=cat]"
+            Types = processSelects "select[name=atype]"
+            Species = processSelects "select[name=species]"
+            Genders = processSelects "select[name=gender]"
+        }
     }
 
-    let ListSpeciesAsync() =
-        AsyncListSpecies()
+    let ListPostOptionsAsync() =
+        AsyncListPostOptions()
         |> Async.StartAsTask
 
     type ExistingGalleryFolderInformation = { FolderId: int64; Name: string }
@@ -392,8 +318,7 @@ module FurAffinity =
             w interior_boundary
             w "Content-Disposition: form-data; name=\"species\""
             w ""
-            let (Species species_id) = metadata.species
-            w species_id
+            w (metadata.species.ToString("d"))
             w interior_boundary
             w "Content-Disposition: form-data; name=\"gender\""
             w ""
