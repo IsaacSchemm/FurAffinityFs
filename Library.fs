@@ -38,7 +38,7 @@ module FurAffinity =
     | ``All`` = 1
 
     type Species =
-    | ``Unspecified_Any`` = 0
+    | ``Unspecified_Any`` = 1
 
     type Gender =
     | ``Any`` = 0
