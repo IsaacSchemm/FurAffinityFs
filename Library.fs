@@ -83,7 +83,7 @@ module FurAffinity =
         make_featured: bool
     }
 
-    let private handler = lazy new SocketsHttpHandler(UseCookies = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5))
+    let private handler = lazy new HttpClientHandler(UseCookies = false)
 
     let private getClient (credentials: ICredentials) =
         let client = new HttpClient(handler.Value, disposeHandler = false)
@@ -92,14 +92,14 @@ module FurAffinity =
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0")
         client
 
-    let private ExtractAuthenticityToken (html: HtmlDocument) =
+    let private ExtractAuthenticityToken (formName: string) (html: HtmlDocument) =
         let m =
-            html.CssSelect("form[name=myform] input[name=key]")
+            html.CssSelect($"form[name={formName}] input[name=key]")
             |> Seq.map (fun e -> e.AttributeValue("value"))
             |> Seq.tryHead
         match m with
             | Some token -> token
-            | None -> failwith "Form \"myform\" with hidden input \"key\" not found in HTML from server"
+            | None -> failwith $"Form \"{formName}\" with hidden input \"key\" not found in HTML from server"
 
     let WhoamiAsync credentials = task {
         use client = getClient credentials
@@ -196,7 +196,7 @@ module FurAffinity =
     | FieldPart of string
     | FilePart of IFile
 
-    let private fromSegments segments =
+    let private multipart segments =
         let content = new MultipartFormDataContent()
         for segment in segments do
             match segment with
@@ -211,13 +211,13 @@ module FurAffinity =
             use! resp = client.GetAsync "/submit/"
             ignore (resp.EnsureSuccessStatusCode())
             let! html = resp.Content.ReadAsStringAsync()
-            let token = html |> HtmlDocument.Parse |> ExtractAuthenticityToken
+            let token = html |> HtmlDocument.Parse |> ExtractAuthenticityToken "myform"
             return token
         }
 
         let! finalize_submission_page_key = task {
             use req = new HttpRequestMessage(System.Net.Http.HttpMethod.Post, "/submit/upload")
-            req.Content <- fromSegments [
+            req.Content <- multipart [
                 "key", FieldPart artwork_submission_page_key
                 "submission_type", FieldPart "submission"
                 "submission", FilePart file
@@ -228,12 +228,12 @@ module FurAffinity =
             let! html = resp.Content.ReadAsStringAsync()
             if html.Contains "Security code missing or invalid." then
                 failwith "Security code missing or invalid for page"
-            return html |> HtmlDocument.Parse |> ExtractAuthenticityToken
+            return html |> HtmlDocument.Parse |> ExtractAuthenticityToken "myform"
         }
 
         return! task {
             let req = new HttpRequestMessage(System.Net.Http.HttpMethod.Post, "/submit/finalize/")
-            req.Content <- fromSegments [
+            req.Content <- multipart [
                 "part", FieldPart "5"
                 "key", FieldPart finalize_submission_page_key
                 "submission_type", FieldPart "submission"
@@ -257,6 +257,41 @@ module FurAffinity =
                 | None -> ()
                 | Some name ->
                     "create_folder_name", FieldPart name
+            ]
+            use! resp = client.SendAsync req
+            let! html = resp.Content.ReadAsStringAsync()
+            if html.Contains "Security code missing or invalid." then
+                failwith "Security code missing or invalid for page"
+        }
+    }
+
+    let private form segments =
+        let content = new FormUrlEncodedContent(dict segments)
+        content
+
+    let PostJournalAsync (credentials: ICredentials) (journal: Journal) = task {
+        use client = getClient credentials
+
+        let! journal_submission_page_key = task {
+            use! resp = client.GetAsync "/controls/journal/"
+            ignore (resp.EnsureSuccessStatusCode())
+            let! html = resp.Content.ReadAsStringAsync()
+            let token = html |> HtmlDocument.Parse |> ExtractAuthenticityToken "MsgForm"
+            return token
+        }
+
+        return! task {
+            let req = new HttpRequestMessage(System.Net.Http.HttpMethod.Post, "/controls/journal/")
+            req.Content <- form [
+                "id", "0"
+                "key", journal_submission_page_key
+                "do", "update"
+                "subject", journal.subject
+                "message", journal.message
+                if journal.disable_comments then
+                    "disable_comments", "on"
+                if journal.make_featured then
+                    "make_featured", "on"
             ]
             use! resp = client.SendAsync req
             let! html = resp.Content.ReadAsStringAsync()
