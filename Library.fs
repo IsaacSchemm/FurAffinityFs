@@ -1,9 +1,7 @@
 ﻿namespace FurAffinityFs
 
 open System
-open System.Text
-open System.IO
-open System.Net
+open System.Net.Http
 open FSharp.Data
 
 module FurAffinity =
@@ -20,28 +18,24 @@ module FurAffinity =
             member this.B = this.b
 
     type IFile =
+        abstract member FileName: string
         abstract member Data: byte array
-        abstract member ContentType: string
 
     type File = {
+        fileName: string
         data: byte array
-        contentType: string
     } with
         interface IFile with
+            member this.FileName = this.fileName
             member this.Data = this.data
-            member this.ContentType = this.contentType
 
-    type Category =
-    | ``All`` = 1
+    type Category = All = 1
 
-    type Type =
-    | ``All`` = 1
+    type Type = All = 1
 
-    type Species =
-    | ``Unspecified_Any`` = 1
+    type Species = Unspecified_Any = 1
 
-    type Gender =
-    | ``Any`` = 0
+    type Gender = Any = 0
 
     type PostOption<'T when 'T :> Enum> = {
         Group: string option
@@ -62,118 +56,10 @@ module FurAffinity =
     | Adult = 1
     | Mature = 2
 
-    let private BaseAddress =
-        new Uri("https://www.furaffinity.net/")
-
-    let private ExtractAuthenticityToken (html: HtmlDocument) =
-        let m =
-            html.CssSelect("form[name=myform] input[name=key]")
-            |> Seq.map (fun e -> e.AttributeValue("value"))
-            |> Seq.tryHead
-        match m with
-            | Some token -> token
-            | None -> failwith "Form \"myform\" with hidden input \"key\" not found in HTML from server"
-
-    let private ToNewCookieContainer (credentials: ICredentials) =
-        let c = new CookieContainer()
-        c.Add(BaseAddress, new Cookie("a", credentials.A))
-        c.Add(BaseAddress, new Cookie("b", credentials.B))
-        c
-
-    let UserAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
-
-    let AsyncWhoami credentials = async {
-        let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/help/"), UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
-        use! resp = req.AsyncGetResponse()
-        use sr = new StreamReader(resp.GetResponseStream())
-        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-        let document = HtmlDocument.Parse html
-        return String.concat " / " [
-            for item in document.CssSelect("#my-username") do
-                item.InnerText().Trim().TrimStart('~')
-        ]
+    type ExistingGalleryFolderInformation = {
+        FolderId: int64
+        Name: string
     }
-
-    let WhoamiAsync credentials =
-        AsyncWhoami credentials
-        |> Async.StartAsTask
-
-    let AsyncListPostOptions() = async {
-        let req = WebRequest.CreateHttp(new Uri(BaseAddress, "/browse/"), UserAgent = UserAgent)
-        use! resp = req.AsyncGetResponse()
-        use sr = new StreamReader(resp.GetResponseStream())
-        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-        let document = HtmlDocument.Parse(html)
-
-        let getName node =
-            node
-            |> HtmlNode.innerText
-        let getValue node =
-            node
-            |> HtmlNode.tryGetAttribute "value"
-            |> Option.map (fun a -> HtmlAttribute.value a)
-            |> Option.defaultValue (getName node)
-        let getLabel node =
-            node
-            |> HtmlNode.tryGetAttribute "label"
-            |> Option.map (fun a -> HtmlAttribute.value a)
-
-        let getDescendants node = HtmlNode.descendants false (fun _ -> true) node
-
-        let processSelects (selector: string) = [
-            for select in document.CssSelect selector do
-                for x in getDescendants select do
-                    match (HtmlNode.name x).ToLowerInvariant() with
-                    | "option" ->
-                        { Group = None; Value = getValue x |> int |> enum; Name = getName x}
-                    | "optgroup" ->
-                        for y in getDescendants x do
-                            { Group = getLabel x; Value = getValue y |> int |> enum; Name = getName y }
-                    | _ -> ()
-        ]
-
-        return {
-            Categories = processSelects "select[name=cat]"
-            Types = processSelects "select[name=atype]"
-            Species = processSelects "select[name=species]"
-            Genders = processSelects "select[name=gender]"
-        }
-    }
-
-    let ListPostOptionsAsync() =
-        AsyncListPostOptions()
-        |> Async.StartAsTask
-
-    type ExistingGalleryFolderInformation = { FolderId: int64; Name: string }
-
-    let AsyncListGalleryFolders (credentials: ICredentials) = async {
-        let req = WebRequest.CreateHttp(new Uri(BaseAddress, $"/controls/folders/submissions/"), UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
-        use! resp = req.AsyncGetResponse()
-        use sr = new StreamReader(resp.GetResponseStream())
-        let! html = sr.ReadToEndAsync() |> Async.AwaitTask
-        let document = HtmlDocument.Parse html
-
-        let regex = new System.Text.RegularExpressions.Regex("^/gallery/[^/]+/folder/([0-9]+)/")
-        let extractId href =
-            let m = regex.Match href
-            if m.Success then Some (Int64.Parse m.Groups[1].Value) else None
-
-        return [
-            for link in document.CssSelect "a" do
-                let id =
-                    link.TryGetAttribute "href"
-                    |> Option.map (fun a -> HtmlAttribute.value a)
-                    |> Option.bind extractId
-                match id with
-                | Some s -> { FolderId = s; Name = HtmlNode.innerText link }
-                | None -> ()
-        ]
-    }
-
-    let ListGalleryFoldersAsync credentials =
-        AsyncListGalleryFolders credentials
-        |> Async.StartAsTask
 
     type ArtworkMetadata = {
         title: string
@@ -190,188 +76,191 @@ module FurAffinity =
         create_folder_name: string option
     }
 
+    type Journal = {
+        subject: string
+        message: string
+        disable_comments: bool
+        make_featured: bool
+    }
+
+    let private handler = lazy new SocketsHttpHandler(UseCookies = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5))
+
+    let private getClient (credentials: ICredentials) =
+        let client = new HttpClient(handler.Value, disposeHandler = false)
+        client.BaseAddress <- new Uri("https://www.furaffinity.net/")
+        client.DefaultRequestHeaders.Add("Cookie", $"a={credentials.A}; b={credentials.B}")
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0")
+        client
+
+    let private ExtractAuthenticityToken (html: HtmlDocument) =
+        let m =
+            html.CssSelect("form[name=myform] input[name=key]")
+            |> Seq.map (fun e -> e.AttributeValue("value"))
+            |> Seq.tryHead
+        match m with
+            | Some token -> token
+            | None -> failwith "Form \"myform\" with hidden input \"key\" not found in HTML from server"
+
+    let WhoamiAsync credentials = task {
+        use client = getClient credentials
+        use! resp = client.GetAsync "/help/"
+        ignore (resp.EnsureSuccessStatusCode())
+
+        let! html = resp.Content.ReadAsStringAsync()
+        let document = HtmlDocument.Parse html
+        return String.concat " / " [
+            for item in document.CssSelect("#my-username") do
+                item.InnerText().Trim().TrimStart('~')
+        ]
+    }
+
+    module private Scraper =
+        let getName node =
+            node
+            |> HtmlNode.innerText
+
+        let getValue node =
+            node
+            |> HtmlNode.tryGetAttribute "value"
+            |> Option.map (fun a -> HtmlAttribute.value a)
+            |> Option.defaultValue (getName node)
+
+        let getLabel node =
+            node
+            |> HtmlNode.tryGetAttribute "label"
+            |> Option.map (fun a -> HtmlAttribute.value a)
+
+        let getDescendants node =
+            HtmlNode.descendants false (fun _ -> true) node
+
+        let getPostOptions (selector: string) (document: HtmlDocument) = [
+            for select in document.CssSelect selector do
+                for x in getDescendants select do
+                    match (HtmlNode.name x).ToLowerInvariant() with
+                    | "option" ->
+                        { Group = None; Value = getValue x |> int |> enum; Name = getName x}
+                    | "optgroup" ->
+                        for y in getDescendants x do
+                            { Group = getLabel x; Value = getValue y |> int |> enum; Name = getName y }
+                    | _ -> ()
+        ]
+
+    let ListPostOptionsAsync credentials = task {
+        use client = getClient credentials
+        use! resp = client.GetAsync "/browse/"
+        ignore (resp.EnsureSuccessStatusCode())
+
+        let! html = resp.Content.ReadAsStringAsync()
+        let document = HtmlDocument.Parse(html)
+
+        return {
+            Categories = document |> Scraper.getPostOptions "select[name=cat]"
+            Types = document |> Scraper.getPostOptions "select[name=atype]"
+            Species = document |> Scraper.getPostOptions "select[name=species]"
+            Genders = document |> Scraper.getPostOptions "select[name=gender]"
+        }
+    }
+
+    let ListGalleryFoldersAsync (credentials: ICredentials) = task {
+        use client = getClient credentials
+        use! resp = client.GetAsync "/controls/folders/submissions/"
+        ignore (resp.EnsureSuccessStatusCode())
+
+        let! html = resp.Content.ReadAsStringAsync()
+        let document = HtmlDocument.Parse html
+
+        let regex = new System.Text.RegularExpressions.Regex("^/gallery/[^/]+/folder/([0-9]+)/")
+        let extractId href =
+            let m = regex.Match href
+            if m.Success then Some (Int64.Parse m.Groups[1].Value) else None
+
+        return [
+            for link in document.CssSelect "a" do
+                let id =
+                    link.TryGetAttribute "href"
+                    |> Option.map (fun a -> HtmlAttribute.value a)
+                    |> Option.bind extractId
+                match id with
+                | Some s ->
+                    { FolderId = s; Name = HtmlNode.innerText link }
+                | None -> ()
+        ]
+    }
+
     let Keywords ([<ParamArray>] arr: string[]) = List.ofArray arr
     let FolderIds ([<ParamArray>] arr: int64[]) = Set.ofArray arr
     let NewFolder (name: string) = Some name
     let NoNewFolder: string option = None
 
-    let AsyncPostArtwork (credentials: ICredentials) (file: File) (metadata: ArtworkMetadata) = async {
-        let toUri (path: string) =
-            new Uri(BaseAddress, path)
+    type MultipartSegmentValue =
+    | FieldPart of string
+    | FilePart of IFile
 
-        let createRequest (credentials: ICredentials) (uri: Uri) =
-            WebRequest.CreateHttp(uri, UserAgent = UserAgent, CookieContainer = ToNewCookieContainer(credentials))
+    let private fromSegments segments =
+        let content = new MultipartFormDataContent()
+        for segment in segments do
+            match segment with
+            | name, FieldPart value -> content.Add(new StringContent(value), name)
+            | name, FilePart file -> content.Add(new ByteArrayContent(file.Data), name, file.FileName)
+        content
 
-        // multipart separators
-        let boundary = sprintf "-----------------------------%d" DateTime.UtcNow.Ticks
-        let interior_boundary = sprintf "--%s" boundary
-        let final_boundary = sprintf "--%s--" boundary
+    let PostArtworkAsync (credentials: ICredentials) (file: IFile) (metadata: ArtworkMetadata) = task {
+        use client = getClient credentials
 
-        let ext = Seq.last (file.contentType.Split('/'))
-        let filename = sprintf "file.%s" ext
-
-        let! artwork_submission_page_key = async {
-            let req = "/submit/" |> toUri |> createRequest credentials
-            use! resp = req.AsyncGetResponse()
-            use sr = new StreamReader(resp.GetResponseStream())
-            let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+        let! artwork_submission_page_key = task {
+            use! resp = client.GetAsync "/submit/"
+            ignore (resp.EnsureSuccessStatusCode())
+            let! html = resp.Content.ReadAsStringAsync()
             let token = html |> HtmlDocument.Parse |> ExtractAuthenticityToken
             return token
         }
 
-        let artwork_submission_page_req = createRequest credentials (toUri "/submit/upload")
-        artwork_submission_page_req.Method <- "POST"
-        artwork_submission_page_req.ContentType <- sprintf "multipart/form-data; boundary=%s" boundary
+        let! finalize_submission_page_key = task {
+            use req = new HttpRequestMessage(System.Net.Http.HttpMethod.Post, "/submit/upload")
+            req.Content <- fromSegments [
+                "key", FieldPart artwork_submission_page_key
+                "submission_type", FieldPart "submission"
+                "submission", FilePart file
+            ]
 
-        let body1 =
-            use memory_buffer = new MemoryStream()
-            let w (s: string) =
-                let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
-                memory_buffer.Write(bytes, 0, bytes.Length)
-
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"key\""
-            w ""
-            w artwork_submission_page_key
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"submission_type\""
-            w ""
-            w "submission"
-            w interior_boundary
-            w (sprintf "Content-Disposition: form-data; name=\"submission\"; filename=\"%s\"" filename)
-            w (sprintf "Content-Type: %s" file.contentType)
-            w ""
-            memory_buffer.Flush()
-            memory_buffer.Write(file.data, 0, file.data.Length)
-            memory_buffer.Flush()
-            w ""
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"thumbnail\"; filename=\"\""
-            w "Content-Type: application/octet-stream"
-            w ""
-            w ""
-            w final_boundary
-
-            memory_buffer.ToArray()
-
-        do! async {
-            use! reqStream = artwork_submission_page_req.GetRequestStreamAsync() |> Async.AwaitTask
-            do! reqStream.WriteAsync(body1, 0, body1.Length) |> Async.AwaitTask
-        }
-
-        let! (finalize_submission_page_key, finalize_submission_page_url) = async {
-            use! resp = artwork_submission_page_req.AsyncGetResponse()
-            use sr = new StreamReader(resp.GetResponseStream())
-            let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+            use! resp = client.SendAsync req
+            ignore (resp.EnsureSuccessStatusCode())
+            let! html = resp.Content.ReadAsStringAsync()
             if html.Contains "Security code missing or invalid." then
-                failwithf "Security code missing or invalid for page %s" resp.ResponseUri.AbsoluteUri
-            let token = html |> HtmlDocument.Parse |> ExtractAuthenticityToken
-            return (token, resp.ResponseUri)
+                failwith "Security code missing or invalid for page"
+            return html |> HtmlDocument.Parse |> ExtractAuthenticityToken
         }
 
-        let finalize_submission_page_req = createRequest credentials finalize_submission_page_url
-        finalize_submission_page_req.Method <- "POST"
-        finalize_submission_page_req.ContentType <- sprintf "multipart/form-data; boundary=%s" boundary
-
-        let body2 =
-            use ms = new MemoryStream()
-            let w (s: string) =
-                let bytes = Encoding.UTF8.GetBytes(sprintf "%s\n" s)
-                ms.Write(bytes, 0, bytes.Length)
-
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"part\""
-            w ""
-            w "5"
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"key\""
-            w ""
-            w finalize_submission_page_key
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"submission_type\""
-            w ""
-            w "submission"
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"cat_duplicate\""
-            w ""
-            w ""
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"title\""
-            w ""
-            w metadata.title
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"message\""
-            w ""
-            w metadata.message
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"keywords\""
-            w ""
-            w (metadata.keywords |> Seq.map (fun s -> s.Replace(' ', '_')) |> String.concat " ")
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"cat\""
-            w ""
-            w (metadata.cat.ToString("d"))
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"atype\""
-            w ""
-            w (metadata.atype.ToString("d"))
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"species\""
-            w ""
-            w (metadata.species.ToString("d"))
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"gender\""
-            w ""
-            w (metadata.gender.ToString("d"))
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"rating\""
-            w ""
-            w (metadata.rating.ToString("d"))
-            w interior_boundary
-            w "Content-Disposition: form-data; name=\"create_folder_name\""
-            w ""
-            w ""
-            if metadata.scrap then
-                w interior_boundary
-                w "Content-Disposition: form-data; name=\"scrap\""
-                w ""
-                w "1"
-            if metadata.lock_comments then
-                w interior_boundary
-                w "Content-Disposition: form-data; name=\"lock_comments\""
-                w ""
-                w "on"
-            for id in metadata.folder_ids do
-                w interior_boundary
-                w "Content-Disposition: form-data; name=\"folder_ids[]\""
-                w ""
-                w (sprintf "%d" id)
-            match metadata.create_folder_name with
-            | Some name ->
-                w interior_boundary
-                w "Content-Disposition: form-data; name=\"create_folder_name\""
-                w ""
-                w name
-            | None -> ()
-            w final_boundary
-
-            ms.ToArray()
-
-        do! async {
-            use! reqStream = finalize_submission_page_req.GetRequestStreamAsync() |> Async.AwaitTask
-            do! reqStream.WriteAsync(body2, 0, body2.Length) |> Async.AwaitTask
-        }
-
-        return! async {
-            use! resp = finalize_submission_page_req.AsyncGetResponse()
-            use sr = new StreamReader(resp.GetResponseStream())
-            let! html = sr.ReadToEndAsync() |> Async.AwaitTask
+        return! task {
+            let req = new HttpRequestMessage(System.Net.Http.HttpMethod.Post, "/submit/finalize/")
+            req.Content <- fromSegments [
+                "part", FieldPart "5"
+                "key", FieldPart finalize_submission_page_key
+                "submission_type", FieldPart "submission"
+                "cat_duplicate", FieldPart ""
+                "title", FieldPart metadata.title
+                "message", FieldPart metadata.message
+                "keywords", FieldPart (metadata.keywords |> Seq.map (fun s -> s.Replace(' ', '_')) |> String.concat " ")
+                "cat", FieldPart (metadata.cat.ToString("d"))
+                "atype", FieldPart (metadata.atype.ToString("d"))
+                "species", FieldPart (metadata.species.ToString("d"))
+                "gender", FieldPart (metadata.gender.ToString("d"))
+                "rating", FieldPart (metadata.rating.ToString("d"))
+                "create_folder_name", FieldPart ""
+                if metadata.scrap then
+                    "scrap", FieldPart "1"
+                if metadata.lock_comments then
+                    "lock_comments", FieldPart "on"
+                for id in metadata.folder_ids do
+                    "folder_ids[]", FieldPart $"{id}"
+                match metadata.create_folder_name with
+                | None -> ()
+                | Some name ->
+                    "create_folder_name", FieldPart name
+            ]
+            use! resp = client.SendAsync req
+            let! html = resp.Content.ReadAsStringAsync()
             if html.Contains "Security code missing or invalid." then
-                failwithf "Security code missing or invalid for page %s" resp.ResponseUri.AbsoluteUri
-            return resp.ResponseUri
+                failwith "Security code missing or invalid for page"
         }
     }
-
-    let PostArtworkAsync credentials file metadata =
-        AsyncPostArtwork credentials file metadata
-        |> Async.StartAsTask

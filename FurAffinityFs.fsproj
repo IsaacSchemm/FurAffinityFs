@@ -1,30 +1,29 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFrameworks>net6.0;net48</TargetFrameworks>
-    <Authors>Isaac Schemm</Authors>
-    <Description>A library that lets you upload artwork to furaffinity.net</Description>
-    <PackageLicenseExpression>MIT-0</PackageLicenseExpression>
-    <Copyright></Copyright>
-    <PackageProjectUrl>https://github.com/IsaacSchemm/FurAffinityFs</PackageProjectUrl>
-    <Version>5.0.0</Version>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFrameworks>net6.0;net48</TargetFrameworks>
+		<Authors>Isaac Schemm</Authors>
+		<Description>A library that lets you upload artwork to furaffinity.net</Description>
+		<PackageLicenseExpression>MIT-0</PackageLicenseExpression>
+		<Copyright></Copyright>
+		<PackageProjectUrl>https://github.com/IsaacSchemm/FurAffinityFs</PackageProjectUrl>
+		<Version>5.0.0</Version>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Include="LICENSE" />
-    <None Include="README.md" Pack="true" PackagePath="\" />
-    <Compile Include="Library.fs" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Include="LICENSE" />
+		<None Include="README.md" Pack="true" PackagePath="\" />
+		<Compile Include="Library.fs" />
+	</ItemGroup>
 
-  <ItemGroup />
+	<ItemGroup>
+		<PackageReference Update="FSharp.Core" Version="7.0.300" />
+		<PackageReference Include="FSharp.Data.Html.Core" Version="6.2.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="FSharp.Data.Html.Core" Version="6.2.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="7.0.300" />
-  </ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+		<PackageReference Include="System.Net.Http" Version="4.3.4" />
+	</ItemGroup>
 
 </Project>
