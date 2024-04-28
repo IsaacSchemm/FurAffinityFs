@@ -83,7 +83,11 @@ module FurAffinity =
         make_featured: bool
     }
 
+    #if NETFRAMEWORK
     let private handler = lazy new HttpClientHandler(UseCookies = false)
+    #else
+    let private handler = lazy new SocketsHttpHandler(UseCookies = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5))
+    #endif
 
     let private getClient (credentials: ICredentials) =
         let client = new HttpClient(handler.Value, disposeHandler = false)
