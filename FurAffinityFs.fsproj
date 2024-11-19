@@ -7,7 +7,7 @@
 		<PackageLicenseExpression>MIT-0</PackageLicenseExpression>
 		<Copyright></Copyright>
 		<PackageProjectUrl>https://github.com/IsaacSchemm/FurAffinityFs</PackageProjectUrl>
-		<Version>5.1.0-beta1</Version>
+		<Version>5.1.0</Version>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
@@ -18,8 +18,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Update="FSharp.Core" Version="7.0.300" />
-		<PackageReference Include="FSharp.Data.Html.Core" Version="6.2.0" />
+		<PackageReference Update="FSharp.Core" Version="9.0.100" />
+		<PackageReference Include="FSharp.Data.Html.Core" Version="6.4.0" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">

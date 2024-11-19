@@ -39,9 +39,10 @@ namespace Demo {
                     species: slime,
                     gender: male,
                     rating: FurAffinity.Rating.General,
-                    folder_ids: FurAffinity.FolderIds(
+                    folder_ids: [
                         galleries[0].FolderId,
-                        galleries[2].FolderId),
+                        galleries[2].FolderId
+                    ],
                     create_folder_name: FurAffinity.NewFolder("abc")));
             Console.WriteLine(result);
         }
