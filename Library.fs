@@ -250,7 +250,6 @@ module FurAffinity =
                 "species", FieldPart (metadata.species.ToString("d"))
                 "gender", FieldPart (metadata.gender.ToString("d"))
                 "rating", FieldPart (metadata.rating.ToString("d"))
-                "create_folder_name", FieldPart ""
                 if metadata.scrap then
                     "scrap", FieldPart "1"
                 if metadata.lock_comments then
