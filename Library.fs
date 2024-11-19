@@ -266,6 +266,8 @@ module FurAffinity =
             let! html = resp.Content.ReadAsStringAsync()
             if html.Contains "Security code missing or invalid." then
                 failwith "Security code missing or invalid for page"
+
+            return resp.RequestMessage.RequestUri
         }
     }
 
